@@ -1,0 +1,35 @@
+name: local_slm
+description: PocketLM using local SLM
+publish_to: "none"
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Internet se model download karne ke liye.
+  dio: ^5.7.0
+
+  # Phone ke local storage ka path lene ke liye.
+  path_provider: ^2.1.5
+
+  # Model ki downloaded state ko locally save karne ke liye.
+  shared_preferences: ^2.5.3
+
+  # Android par GGUF models ko llama.cpp ke through locally run karne ke liye.
+  llama_flutter_android: ^0.2.6
+
+  # SVG logo ko Flutter mein render karne ke liye.
+  flutter_svg: ^2.0.17
+
+  # Icons ke liye.
+  cupertino_icons: ^1.0.8
+
+flutter:
+
+  uses-material-design: true
+
+  assets:
+    - assets/model_logos/

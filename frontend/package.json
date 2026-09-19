@@ -1,0 +1,12 @@
+{
+  "name": "pocketlm-slm",
+  "version": "1.0.0",
+  "description": "PocketLM Frontend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["slm", "offline", "ai", "chatbot"],
+  "author": "",
+  "license": "ISC"
+}

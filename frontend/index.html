@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+  <title>PocketLM - Offline SLM</title>
+  <style>
+    @layer base {
+      html, body {
+        width: 100vw;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        overscroll-behavior: none;
+        min-height: max(884px, 100dvh);
+      }
+      .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+      main > :first-child {
+        margin-top: 0 !important;
+      }
+      main > :last-child {
+        margin-bottom: 0 !important;
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    /* Smooth view transitions */
+    .app-screen {
+      display: none;
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+    }
+    .app-screen.active {
+      display: flex;
+      opacity: 1;
+    }
+  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-secondary-container": "#00714d",
+            "surface-container-lowest": "#ffffff",
+            "on-primary-fixed-variant": "#4f2ca6",
+            "secondary-fixed-dim": "#4edea3",
+            "on-primary-fixed": "#21005e",
+            "tertiary-fixed": "#ffdad7",
+            "on-error-container": "#93000a",
+            "on-surface-variant": "#494553",
+            "surface-container-highest": "#e3e2e6",
+            "outline": "#7a7584",
+            "on-tertiary-fixed-variant": "#930013",
+            "secondary-container": "#6cf8bb",
+            "on-secondary-fixed": "#002113",
+            "on-primary": "#ffffff",
+            "surface-container": "#eeedf1",
+            "secondary-fixed": "#6ffbbe",
+            "inverse-on-surface": "#f1f0f4",
+            "primary-container": "#7050c8",
+            "on-surface": "#1a1c1e",
+            "on-tertiary-fixed": "#410004",
+            "outline-variant": "#cbc4d5",
+            "primary-fixed": "#e8ddff",
+            "on-secondary": "#ffffff",
+            "secondary": "#006c49",
+            "error-container": "#ffdad6",
+            "on-background": "#1a1c1e",
+            "tertiary-container": "#c5242b",
+            "on-primary-container": "#ebe1ff",
+            "on-tertiary-container": "#ffddda",
+            "surface": "#faf9fd",
+            "surface-variant": "#e3e2e6",
+            "on-error": "#ffffff",
+            "error": "#ba1a1a",
+            "surface-dim": "#dad9dd",
+            "background": "#faf9fd",
+            "on-secondary-fixed-variant": "#005236",
+            "surface-bright": "#faf9fd",
+            "tertiary": "#a10016",
+            "inverse-surface": "#2f3033",
+            "surface-tint": "#6847bf",
+            "on-tertiary": "#ffffff",
+            "primary": "#5735ae",
+            "surface-container-low": "#f4f3f7",
+            "primary-fixed-dim": "#cebdff",
+            "inverse-primary": "#cebdff",
+            "tertiary-fixed-dim": "#ffb3ad",
+            "surface-container-high": "#e8e8ec"
+          },
+          borderRadius: {
+            DEFAULT: "0.25rem",
+            lg: "0.5rem",
+            xl: "0.75rem",
+            full: "9999px"
+          },
+          spacing: {
+            "space-sm": "8px",
+            "space-xs": "4px",
+            "space-lg": "24px",
+            "space-xl": "32px",
+            "margin": "16px",
+            "gutter": "16px",
+            "space-md": "16px"
+          }
+        }
+      }
+    };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+</head>
+
+  <!-- ================= NAVIGATION DRAWER ================= -->
+  <div id="nav-drawer-backdrop" class="fixed inset-0 bg-on-surface/40 backdrop-blur-sm z-50 hidden opacity-0 transition-opacity duration-300"></div>
+
+  <aside id="nav-drawer-panel" class="fixed top-0 left-0 bottom-0 w-72 max-w-[85vw] bg-surface z-50 shadow-2xl flex flex-col -translate-x-full transition-transform duration-300 ease-out border-r border-surface-variant/40">
+    <!-- Drawer Header -->
+    <div class="h-16 px-gutter flex items-center justify-between border-b border-surface-variant/40">
+      <div class="flex items-center gap-space-xs">
+        <img alt="PocketLM Logo" class="h-8 w-8 object-contain rounded-md" src="https://lh3.googleusercontent.com/aida/AEtjO1WOfsFRA6nVuVGZ-5PeVSD8lR_uO8Ie-IL_J0197cR0MrkFfEi6p0lukucfbYt1cgqyy_SDEyEgHR1AzfrOZmciosTlDCkGLASkfYzceWULDMYsohogo2XWR5Ey6ojxqTbCgkGwNpPwAxLD7EQEtYRTLrcgyb9En9k0Mupjuwj-HoIne9nYf5nePj7qh-CTkAVFnuweH_rXeQATfzwUT1UVdWfWN0CYxM9UbpdPV7uOsJnY7U-UZ2XRGNs">
+        <span class="font-bold text-on-surface text-base">PocketLM</span>
+      </div>
+      <button id="close-drawer-btn" class="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 transition-colors cursor-pointer">
+        <span class="material-symbols-outlined text-[20px]">close</span>
+      </button>
+    </div>
+
+    <!-- Offline Status Pill -->
+    <div class="px-4 py-3">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface-container-low border border-surface-variant/40 text-xs text-on-surface-variant">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="font-medium text-on-surface">100% Offline &amp; Private</span>
+      </div>
+    </div>
+
+    <!-- Menu Items List -->
+    <div class="flex-1 px-3 py-1 flex flex-col gap-1 overflow-y-auto">
+      
+      <!-- 1. Chat -->
+      <button class="drawer-menu-btn flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium text-on-surface hover:bg-surface-container-low transition-all text-left cursor-pointer" data-target="chat">
+        <span class="material-symbols-outlined text-[20px] text-on-surface-variant">chat</span>
+        <span>Chat</span>
+      </button>
+
+      <!-- 2. Chat History (Directly below Chat, above Pals) -->
+      <button class="drawer-menu-btn flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium text-on-surface hover:bg-surface-container-low transition-all text-left cursor-pointer" data-target="history">
+        <span class="material-symbols-outlined text-[20px] text-primary">chat_bubble</span>
+        <span class="flex-1 font-semibold text-primary">Chat History</span>
+        <span id="drawer-history-badge" class="px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-container text-on-primary-container">3</span>
+      </button>
+
+      <!-- 3. Pals (Directly below Chat History) -->
+      <button class="drawer-menu-btn flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium text-on-surface hover:bg-surface-container-low transition-all text-left cursor-pointer opacity-70" data-target="pals">
+        <span class="material-symbols-outlined text-[20px] text-on-surface-variant">smart_toy</span>
+        <span>Pals</span>
+        <span class="ml-auto text-[10px] uppercase font-bold text-on-surface-variant/70 bg-surface-container px-2 py-0.5 rounded-full">Soon</span>
+      </button>
+
+      <div class="my-2 border-t border-surface-variant/40"></div>
+
+      <!-- 4. Models -->
+      <button class="drawer-menu-btn flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium text-on-surface hover:bg-surface-container-low transition-all text-left cursor-pointer" data-target="models">
+        <span class="material-symbols-outlined text-[20px] text-on-surface-variant">neurology</span>
+        <span>Models</span>
+      </button>
+
+      <!-- 5. Benchmark -->
+      <button class="drawer-menu-btn flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium text-on-surface hover:bg-surface-container-low transition-all text-left cursor-pointer" data-target="benchmark">
+        <span class="material-symbols-outlined text-[20px] text-on-surface-variant">speed</span>
+        <span>Benchmark</span>
+      </button>
+
+      <!-- 6. Settings -->
+      <button class="drawer-menu-btn flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium text-on-surface hover:bg-surface-container-low transition-all text-left cursor-pointer" data-target="settings">
+        <span class="material-symbols-outlined text-[20px] text-on-surface-variant">settings</span>
+        <span>Settings</span>
+      </button>
+
+    </div>
+
+    <!-- Drawer Footer -->
+    <div class="p-4 border-t border-surface-variant/40 bg-surface-container-lowest/50">
+      <div class="text-xs text-on-surface-variant flex items-center justify-between">
+        <span>SLM Studio v1.0</span>
+        <span class="font-medium text-primary">On-Device Cache</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= TOP APP HEADER ================= -->
+  <header class="fixed top-0 inset-x-0 z-40 bg-surface/80 backdrop-blur-xl pt-safe border-b border-surface-variant/40">
+    <div class="h-16 px-gutter flex items-center justify-between relative max-w-4xl mx-auto w-full">
+      
+      <!-- Left: Navigation / Menu button & App Logo -->
+      <div class="flex items-center gap-space-sm">
+        <button id="header-left-btn" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant/60 transition-all text-on-surface-variant cursor-pointer" title="Open Menu">
+          <span id="header-left-icon" class="material-symbols-outlined text-[22px]">menu</span>
+        </button>
+        <div class="flex items-center gap-space-xs">
+          <img id="header-app-logo" alt="PocketLM Logo" class="h-8 w-8 object-contain rounded-md" src="https://lh3.googleusercontent.com/aida/AEtjO1WOfsFRA6nVuVGZ-5PeVSD8lR_uO8Ie-IL_J0197cR0MrkFfEi6p0lukucfbYt1cgqyy_SDEyEgHR1AzfrOZmciosTlDCkGLASkfYzceWULDMYsohogo2XWR5Ey6ojxqTbCgkGwNpPwAxLD7EQEtYRTLrcgyb9En9k0Mupjuwj-HoIne9nYf5nePj7qh-CTkAVFnuweH_rXeQATfzwUT1UVdWfWN0CYxM9UbpdPV7uOsJnY7U-UZ2XRGNs">
+          <span id="header-screen-title" class="text-headline-sm font-bold text-on-surface">PocketLM</span>
+        </div>
+      </div>
+
+      <!-- Right: Status Pill & Avatar -->
+      <div class="flex items-center gap-space-xs">
+        <div class="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-low text-xs font-medium text-on-surface-variant border border-surface-variant/50">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>100% Offline</span>
+        </div>
+        <button class="w-9 h-9 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-variant/60 transition-colors">
+          <span class="material-symbols-outlined text-[20px]">filter_list</span>
+        </button>
+        <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary shadow-sm">
+          <span class="material-symbols-outlined text-[18px]">person</span>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTENT AREA ================= -->
+  <main class="flex flex-col relative w-full max-w-4xl mx-auto px-gutter pt-16 pb-24 bg-surface flex-grow">
+
+    <!-- =======================================================
+         VIEW 1: CHAT EMPTY STATE (SCREEN 1)
+         ======================================================= -->
+    <div id="view-chat" class="app-screen active flex-col items-center justify-center min-h-[72vh] px-4 text-center my-auto py-6">
+      
+      <!-- Center Robot Artwork -->
+      <div class="w-24 h-24 mb-6 flex items-center justify-center relative">
+        <div class="absolute inset-0 bg-primary-container/10 rounded-full blur-xl transform scale-125"></div>
+        <img alt="PocketLM Logo" class="w-20 h-20 object-contain relative z-10 drop-shadow-sm" src="https://lh3.googleusercontent.com/aida/AEtjO1WOfsFRA6nVuVGZ-5PeVSD8lR_uO8Ie-IL_J0197cR0MrkFfEi6p0lukucfbYt1cgqyy_SDEyEgHR1AzfrOZmciosTlDCkGLASkfYzceWULDMYsohogo2XWR5Ey6ojxqTbCgkGwNpPwAxLD7EQEtYRTLrcgyb9En9k0Mupjuwj-HoIne9nYf5nePj7qh-CTkAVFnuweH_rXeQATfzwUT1UVdWfWN0CYxM9UbpdPV7uOsJnY7U-UZ2XRGNs">
+      </div>
+
+      <h2 class="text-2xl font-bold text-on-surface mb-2 tracking-tight">No Models Available</h2>
+      <p class="text-sm text-on-surface-variant mb-6 max-w-[290px] leading-relaxed">Download a model to start chatting with SLM offline and privately.</p>
+
+      <!-- Primary Action: Navigate to Models -->
+      <button id="btn-download-model-cta" class="w-[185px] h-10 bg-primary text-on-primary rounded-full font-medium text-sm shadow-md hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center gap-2 mb-8 cursor-pointer">
+        <span class="material-symbols-outlined text-[18px]">download</span>
+        <span>Download Model</span>
+      </button>
+
+      <!-- Warning info pill card -->
+      <div class="w-full max-w-sm bg-surface-container-low border border-surface-variant/40 rounded-2xl p-4 text-left shadow-sm mb-4 flex items-center gap-3">
+        <span class="material-symbols-outlined text-[20px] text-primary shrink-0">info</span>
+        <p class="text-xs sm:text-sm text-on-surface font-medium">Hi, Model not loaded. Please initialize the model to start conversation.</p>
+      </div>
+
+      <!-- Bottom Chat Input Pill -->
+      <div class="w-full max-w-sm relative flex items-center bg-surface-container-low border border-surface-variant/50 rounded-full px-4 py-1.5 shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+        <input id="chat-empty-input" class="w-full bg-transparent py-2 text-sm text-on-surface placeholder:text-outline focus:outline-none" placeholder="What would you like to know..." type="text">
+        <button id="chat-empty-send-btn" class="w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 hover:bg-primary/90 transition-all shadow-sm">
+          <span class="material-symbols-outlined text-[18px]">send</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- =======================================================
+         VIEW 2: AVAILABLE MODELS SCREEN (SCREEN 2)
+         ======================================================= -->
+    <div id="view-models" class="app-screen flex-col w-full pb-16">
+      
+      <!-- Section Header -->
+      <div class="flex flex-col gap-space-xs mb-space-md pt-2">
+        <h1 class="text-2xl font-bold text-on-surface tracking-tight">Available Models</h1>
+        <p class="text-sm text-on-surface-variant">Download a model to start chatting with SLM locally.</p>
+      </div>
+
+      <!-- Models List Container -->
+      <div id="models-container-list" class="flex flex-col gap-space-md">
+        
+        <!-- 1. Gemma 3 4B -->
+        <div class="flex flex-col p-space-md rounded-xl bg-surface-container-low border border-surface-variant/30 shadow-sm transition-all hover:shadow-md" data-model="gemma-3-4b">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-space-md">
+              <div class="w-12 h-12 rounded-xl bg-white shadow-sm border border-surface-variant/40 flex items-center justify-center shrink-0 overflow-hidden">
+                <!-- Official Google DeepMind Gemma Model Mark -->
+                <svg class="w-8 h-8" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="gemmaGrad1" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#1A73E8"/>
+                      <stop offset="35%" stop-color="#4285F4"/>
+                      <stop offset="70%" stop-color="#8E44AD"/>
+                      <stop offset="100%" stop-color="#EA4335"/>
+                    </linearGradient>
+                    <linearGradient id="gemmaGrad2" x1="44" y1="4" x2="4" y2="44" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#00C9FF"/>
+                      <stop offset="60%" stop-color="#6C5CE7"/>
+                      <stop offset="100%" stop-color="#FF5376"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M24 3C24 14.6 33.4 24 45 24C33.4 24 24 33.4 24 45C24 33.4 14.6 24 3 24C14.6 24 24 14.6 24 3Z" fill="url(#gemmaGrad1)"/>
+                  <path d="M24 9C24 17.28 30.72 24 39 24C30.72 24 24 30.72 24 39C24 30.72 17.28 24 9 24C17.28 24 24 17.28 24 9Z" fill="url(#gemmaGrad2)" fill-opacity="0.85"/>
+                  <circle cx="24" cy="24" r="4" fill="#FFFFFF"/>
+                  <path d="M24 12L26.5 21.5L36 24L26.5 26.5L24 36L21.5 26.5L12 24L21.5 21.5Z" fill="#FFFFFF" fill-opacity="0.95"/>
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="font-semibold text-base text-on-surface">Gemma 3 4B</span>
+                <span class="text-xs text-on-surface-variant">2.37 GB • 8k Context</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-space-xs shrink-0">
+              <button class="btn-model-download flex items-center gap-space-xs px-space-md py-2 rounded-full bg-primary-container text-on-primary-container hover:bg-primary-container/90 active:scale-95 transition-all cursor-pointer shadow-sm" onclick="simulateDownload(this, 'Gemma 3 4B')">
+                <span class="material-symbols-outlined text-[18px]">download</span>
+                <span class="text-xs font-semibold text-on-primary-container">Download</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/60 transition-colors rounded-lg" title="Settings" onclick="openModelSettings('Gemma 3 4B')">
+                <span class="material-symbols-outlined text-[20px]">tune</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/40 transition-colors rounded-lg" title="Delete" onclick="deleteModel(this, 'Gemma 3 4B')">
+                <span class="material-symbols-outlined text-[20px]">delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Gemma 4 E2B -->
+        <div class="flex flex-col p-space-md rounded-xl bg-surface-container-low border border-surface-variant/30 shadow-sm transition-all hover:shadow-md" data-model="gemma-4-e2b">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-space-md">
+              <div class="w-12 h-12 rounded-xl bg-white shadow-sm border border-surface-variant/40 flex items-center justify-center shrink-0 overflow-hidden">
+                <!-- Official Google DeepMind Gemma Model Mark -->
+                <svg class="w-8 h-8" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="gemmaGrad3" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#1A73E8"/>
+                      <stop offset="35%" stop-color="#4285F4"/>
+                      <stop offset="70%" stop-color="#8E44AD"/>
+                      <stop offset="100%" stop-color="#EA4335"/>
+                    </linearGradient>
+                    <linearGradient id="gemmaGrad4" x1="44" y1="4" x2="4" y2="44" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#00C9FF"/>
+                      <stop offset="60%" stop-color="#6C5CE7"/>
+                      <stop offset="100%" stop-color="#FF5376"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M24 3C24 14.6 33.4 24 45 24C33.4 24 24 33.4 24 45C24 33.4 14.6 24 3 24C14.6 24 24 14.6 24 3Z" fill="url(#gemmaGrad3)"/>
+                  <path d="M24 9C24 17.28 30.72 24 39 24C30.72 24 24 30.72 24 39C24 30.72 17.28 24 9 24C17.28 24 24 17.28 24 9Z" fill="url(#gemmaGrad4)" fill-opacity="0.85"/>
+                  <circle cx="24" cy="24" r="4" fill="#FFFFFF"/>
+                  <path d="M24 12L26.5 21.5L36 24L26.5 26.5L24 36L21.5 26.5L12 24L21.5 21.5Z" fill="#FFFFFF" fill-opacity="0.95"/>
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="font-semibold text-base text-on-surface">Gemma 4 E2B</span>
+                <span class="text-xs text-on-surface-variant">4.03 GB • Multimodal Ex</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-space-xs shrink-0">
+              <button class="btn-model-download flex items-center gap-space-xs px-space-md py-2 rounded-full bg-primary-container text-on-primary-container hover:bg-primary-container/90 active:scale-95 transition-all cursor-pointer shadow-sm" onclick="simulateDownload(this, 'Gemma 4 E2B')">
+                <span class="material-symbols-outlined text-[18px]">download</span>
+                <span class="text-xs font-semibold text-on-primary-container">Download</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/60 transition-colors rounded-lg" title="Settings" onclick="openModelSettings('Gemma 4 E2B')">
+                <span class="material-symbols-outlined text-[20px]">tune</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/40 transition-colors rounded-lg" title="Delete" onclick="deleteModel(this, 'Gemma 4 E2B')">
+                <span class="material-symbols-outlined text-[20px]">delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Bonsai 8B -->
+        <div class="flex flex-col p-space-md rounded-xl bg-surface-container-low border border-surface-variant/30 shadow-sm transition-all hover:shadow-md" data-model="bonsai-8b">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-space-md">
+              <div class="w-12 h-12 rounded-xl bg-white shadow-sm border border-surface-variant/40 flex items-center justify-center shrink-0 overflow-hidden">
+                <!-- Bonsai Tree Logo (matching reference screenshot) -->
+                <svg class="w-8 h-8" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M11 38H37L34.5 42.5H13.5L11 38Z" fill="#1A1C1E"/>
+                  <line x1="16" y1="42.5" x2="16" y2="44.5" stroke="#1A1C1E" stroke-width="2.2" stroke-linecap="round"/>
+                  <line x1="32" y1="42.5" x2="32" y2="44.5" stroke="#1A1C1E" stroke-width="2.2" stroke-linecap="round"/>
+                  <path d="M24 38V30C24 26 20.5 24 16.5 22" stroke="#1A1C1E" stroke-width="3.5" stroke-linecap="round"/>
+                  <path d="M23 27C27 25 31 22 33 18" stroke="#1A1C1E" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M24 30V15" stroke="#1A1C1E" stroke-width="3" stroke-linecap="round"/>
+                  <ellipse cx="14.5" cy="20.5" rx="7.5" ry="3.8" fill="#1A1C1E"/>
+                  <ellipse cx="33.5" cy="16.5" rx="8" ry="4.2" fill="#1A1C1E"/>
+                  <ellipse cx="24" cy="12.5" rx="9" ry="4.5" fill="#1A1C1E"/>
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="font-semibold text-base text-on-surface">Bonsai 8B</span>
+                <span class="text-xs text-on-surface-variant">1.16 GB • Code & Logic</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-space-xs shrink-0">
+              <button class="btn-model-download flex items-center gap-space-xs px-space-md py-2 rounded-full bg-primary-container text-on-primary-container hover:bg-primary-container/90 active:scale-95 transition-all cursor-pointer shadow-sm" onclick="simulateDownload(this, 'Bonsai 8B')">
+                <span class="material-symbols-outlined text-[18px]">download</span>
+                <span class="text-xs font-semibold text-on-primary-container">Download</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/60 transition-colors rounded-lg" title="Settings" onclick="openModelSettings('Bonsai 8B')">
+                <span class="material-symbols-outlined text-[20px]">tune</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/40 transition-colors rounded-lg" title="Delete" onclick="deleteModel(this, 'Bonsai 8B')">
+                <span class="material-symbols-outlined text-[20px]">delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Phi-4 Mini -->
+        <div class="flex flex-col p-space-md rounded-xl bg-surface-container-low border border-surface-variant/30 shadow-sm transition-all hover:shadow-md" data-model="phi-4-mini">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-space-md">
+              <div class="w-12 h-12 rounded-xl bg-white shadow-sm border border-surface-variant/40 flex items-center justify-center shrink-0 overflow-hidden">
+                <!-- Official Microsoft Phi Logo -->
+                <svg class="w-8 h-8" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="phiGrad" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#00BCF2"/>
+                      <stop offset="45%" stop-color="#0078D4"/>
+                      <stop offset="100%" stop-color="#6B46C1"/>
+                    </linearGradient>
+                  </defs>
+                  <circle cx="24" cy="24" r="14.5" stroke="url(#phiGrad)" stroke-width="4.5"/>
+                  <path d="M24 5V43" stroke="url(#phiGrad)" stroke-width="4.5" stroke-linecap="round"/>
+                  <circle cx="24" cy="24" r="6" fill="url(#phiGrad)" fill-opacity="0.2"/>
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="font-semibold text-base text-on-surface">Phi-4 Mini</span>
+                <span class="text-xs text-on-surface-variant">2.33 GB • Fast Reasoning</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-space-xs shrink-0">
+              <button class="btn-model-download flex items-center gap-space-xs px-space-md py-2 rounded-full bg-primary-container text-on-primary-container hover:bg-primary-container/90 active:scale-95 transition-all cursor-pointer shadow-sm" onclick="simulateDownload(this, 'Phi-4 Mini')">
+                <span class="material-symbols-outlined text-[18px]">download</span>
+                <span class="text-xs font-semibold text-on-primary-container">Download</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/60 transition-colors rounded-lg" title="Settings" onclick="openModelSettings('Phi-4 Mini')">
+                <span class="material-symbols-outlined text-[20px]">tune</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/40 transition-colors rounded-lg" title="Delete" onclick="deleteModel(this, 'Phi-4 Mini')">
+                <span class="material-symbols-outlined text-[20px]">delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Bonsai 4B -->
+        <div class="flex flex-col p-space-md rounded-xl bg-surface-container-low border border-surface-variant/30 shadow-sm transition-all hover:shadow-md" data-model="bonsai-4b">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-space-md">
+              <div class="w-12 h-12 rounded-xl bg-white shadow-sm border border-surface-variant/40 flex items-center justify-center shrink-0 overflow-hidden">
+                <!-- Bonsai Tree Logo (matching reference screenshot) -->
+                <svg class="w-8 h-8" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M11 38H37L34.5 42.5H13.5L11 38Z" fill="#1A1C1E"/>
+                  <line x1="16" y1="42.5" x2="16" y2="44.5" stroke="#1A1C1E" stroke-width="2.2" stroke-linecap="round"/>
+                  <line x1="32" y1="42.5" x2="32" y2="44.5" stroke="#1A1C1E" stroke-width="2.2" stroke-linecap="round"/>
+                  <path d="M24 38V30C24 26 20.5 24 16.5 22" stroke="#1A1C1E" stroke-width="3.5" stroke-linecap="round"/>
+                  <path d="M23 27C27 25 31 22 33 18" stroke="#1A1C1E" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M24 30V15" stroke="#1A1C1E" stroke-width="3" stroke-linecap="round"/>
+                  <ellipse cx="14.5" cy="20.5" rx="7.5" ry="3.8" fill="#1A1C1E"/>
+                  <ellipse cx="33.5" cy="16.5" rx="8" ry="4.2" fill="#1A1C1E"/>
+                  <ellipse cx="24" cy="12.5" rx="9" ry="4.5" fill="#1A1C1E"/>
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="font-semibold text-base text-on-surface">Bonsai 4B</span>
+                <span class="text-xs text-on-surface-variant">572.27 MB • Lightweight Agent</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-space-xs shrink-0">
+              <button class="btn-model-download flex items-center gap-space-xs px-space-md py-2 rounded-full bg-primary-container text-on-primary-container hover:bg-primary-container/90 active:scale-95 transition-all cursor-pointer shadow-sm" onclick="simulateDownload(this, 'Bonsai 4B')">
+                <span class="material-symbols-outlined text-[18px]">download</span>
+                <span class="text-xs font-semibold text-on-primary-container">Download</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/60 transition-colors rounded-lg" title="Settings" onclick="openModelSettings('Bonsai 4B')">
+                <span class="material-symbols-outlined text-[20px]">tune</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/40 transition-colors rounded-lg" title="Delete" onclick="deleteModel(this, 'Bonsai 4B')">
+                <span class="material-symbols-outlined text-[20px]">delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Gemma 3 1B -->
+        <div class="flex flex-col p-space-md rounded-xl bg-surface-container-low border border-surface-variant/30 shadow-sm transition-all hover:shadow-md" data-model="gemma-3-1b">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-space-md">
+              <div class="w-12 h-12 rounded-xl bg-white shadow-sm border border-surface-variant/40 flex items-center justify-center shrink-0 overflow-hidden">
+                <!-- Official Google DeepMind Gemma Model Mark -->
+                <svg class="w-8 h-8" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="gemmaGrad5" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#1A73E8"/>
+                      <stop offset="35%" stop-color="#4285F4"/>
+                      <stop offset="70%" stop-color="#8E44AD"/>
+                      <stop offset="100%" stop-color="#EA4335"/>
+                    </linearGradient>
+                    <linearGradient id="gemmaGrad6" x1="44" y1="4" x2="4" y2="44" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#00C9FF"/>
+                      <stop offset="60%" stop-color="#6C5CE7"/>
+                      <stop offset="100%" stop-color="#FF5376"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M24 3C24 14.6 33.4 24 45 24C33.4 24 24 33.4 24 45C24 33.4 14.6 24 3 24C14.6 24 24 14.6 24 3Z" fill="url(#gemmaGrad5)"/>
+                  <path d="M24 9C24 17.28 30.72 24 39 24C30.72 24 24 30.72 24 39C24 30.72 17.28 24 9 24C17.28 24 24 17.28 24 9Z" fill="url(#gemmaGrad6)" fill-opacity="0.85"/>
+                  <circle cx="24" cy="24" r="4" fill="#FFFFFF"/>
+                  <path d="M24 12L26.5 21.5L36 24L26.5 26.5L24 36L21.5 26.5L12 24L21.5 21.5Z" fill="#FFFFFF" fill-opacity="0.95"/>
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="font-semibold text-base text-on-surface">Gemma 3 1B</span>
+                <span class="text-xs text-on-surface-variant">806.06 MB • Ultra Fast</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-space-xs shrink-0">
+              <button class="btn-model-download flex items-center gap-space-xs px-space-md py-2 rounded-full bg-primary-container text-on-primary-container hover:bg-primary-container/90 active:scale-95 transition-all cursor-pointer shadow-sm" onclick="simulateDownload(this, 'Gemma 3 1B')">
+                <span class="material-symbols-outlined text-[18px]">download</span>
+                <span class="text-xs font-semibold text-on-primary-container">Download</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/60 transition-colors rounded-lg" title="Settings" onclick="openModelSettings('Gemma 3 1B')">
+                <span class="material-symbols-outlined text-[20px]">tune</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/40 transition-colors rounded-lg" title="Delete" onclick="deleteModel(this, 'Gemma 3 1B')">
+                <span class="material-symbols-outlined text-[20px]">delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. Qwen 2.5 3B -->
+        <div class="flex flex-col p-space-md rounded-xl bg-surface-container-low border border-surface-variant/30 shadow-sm transition-all hover:shadow-md" data-model="qwen-2.5-3b">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-space-md">
+              <div class="w-12 h-12 rounded-xl bg-white shadow-sm border border-surface-variant/40 flex items-center justify-center shrink-0 overflow-hidden">
+                <!-- Official Alibaba Qwen Interlocking 3D Hexagon Prism Mark (matching reference screenshot) -->
+                <svg class="w-8 h-8" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="qwenA" x1="8" y1="8" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#4F46E5"/>
+                      <stop offset="50%" stop-color="#6366F1"/>
+                      <stop offset="100%" stop-color="#8B5CF6"/>
+                    </linearGradient>
+                    <linearGradient id="qwenB" x1="40" y1="8" x2="8" y2="40" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#3B82F6"/>
+                      <stop offset="100%" stop-color="#7C3AED"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M24 5L40 14.5V33.5L24 43L8 33.5V14.5L24 5Z" stroke="url(#qwenA)" stroke-width="4.5" stroke-linejoin="round"/>
+                  <path d="M24 5L40 14.5L24 24L8 14.5L24 5Z" fill="url(#qwenB)" fill-opacity="0.35"/>
+                  <path d="M24 24V43" stroke="url(#qwenA)" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M24 24L40 14.5" stroke="url(#qwenA)" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M24 24L8 14.5" stroke="url(#qwenA)" stroke-width="3" stroke-linecap="round"/>
+                  <circle cx="24" cy="24" r="3.5" fill="#6366F1"/>
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="font-semibold text-base text-on-surface">Qwen 2.5 3B</span>
+                <span class="text-xs text-on-surface-variant">1.81 GB • General & Coding</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-space-xs shrink-0">
+              <button class="btn-model-download flex items-center gap-space-xs px-space-md py-2 rounded-full bg-primary-container text-on-primary-container hover:bg-primary-container/90 active:scale-95 transition-all cursor-pointer shadow-sm" onclick="simulateDownload(this, 'Qwen 2.5 3B')">
+                <span class="material-symbols-outlined text-[18px]">download</span>
+                <span class="text-xs font-semibold text-on-primary-container">Download</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/60 transition-colors rounded-lg" title="Settings" onclick="openModelSettings('Qwen 2.5 3B')">
+                <span class="material-symbols-outlined text-[20px]">tune</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/40 transition-colors rounded-lg" title="Delete" onclick="deleteModel(this, 'Qwen 2.5 3B')">
+                <span class="material-symbols-outlined text-[20px]">delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 8. TinyLlama 1.1B -->
+        <div class="flex flex-col p-space-md rounded-xl bg-surface-container-low border border-surface-variant/30 shadow-sm transition-all hover:shadow-md" data-model="tinyllama-1.1b">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-space-md">
+              <div class="w-12 h-12 rounded-xl bg-white shadow-sm border border-surface-variant/40 flex items-center justify-center shrink-0 overflow-hidden">
+                <!-- Official TinyLlama Cute Llama Face Mark (matching reference screenshot) -->
+                <svg class="w-8 h-8" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Left Ear -->
+                  <path d="M16 20V7C16 5.34 17.34 4 19 4C20.66 4 22 5.34 22 7V16" stroke="#1A1C1E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="#FFFFFF"/>
+                  <path d="M18.5 12V7.5" stroke="#F472B6" stroke-width="2" stroke-linecap="round"/>
+                  <!-- Right Ear -->
+                  <path d="M26 16V7C26 5.34 27.34 4 29 4C30.66 4 32 5.34 32 7V20" stroke="#1A1C1E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="#FFFFFF"/>
+                  <path d="M29.5 12V7.5" stroke="#F472B6" stroke-width="2" stroke-linecap="round"/>
+                  <!-- Head Outline -->
+                  <path d="M16 19C16 16.5 18.5 15.5 24 15.5C29.5 15.5 32 16.5 32 19V33C32 38.5 28.5 42 24 42C19.5 42 16 38.5 16 33V19Z" stroke="#1A1C1E" stroke-width="2.6" stroke-linejoin="round" fill="#FFFFFF"/>
+                  <!-- Eyes -->
+                  <circle cx="20.5" cy="25" r="2.2" fill="#1A1C1E"/>
+                  <circle cx="27.5" cy="25" r="2.2" fill="#1A1C1E"/>
+                  <circle cx="21.2" cy="24.4" r="0.7" fill="#FFFFFF"/>
+                  <circle cx="28.2" cy="24.4" r="0.7" fill="#FFFFFF"/>
+                  <!-- Pink Cheek Blush -->
+                  <ellipse cx="18.5" cy="28.5" rx="1.6" ry="1.2" fill="#FBCFE8"/>
+                  <ellipse cx="29.5" cy="28.5" rx="1.6" ry="1.2" fill="#FBCFE8"/>
+                  <!-- Snout & Mouth -->
+                  <ellipse cx="24" cy="32.5" rx="4.2" ry="3.2" fill="#F3F4F6" stroke="#1A1C1E" stroke-width="1.8"/>
+                  <path d="M22.5 31.8H25.5" stroke="#1A1C1E" stroke-width="1.6" stroke-linecap="round"/>
+                  <path d="M24 31.8V33.8" stroke="#1A1C1E" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="flex flex-col">
+                <span class="font-semibold text-base text-on-surface">TinyLlama 1.1B</span>
+                <span class="text-xs text-on-surface-variant">637.24 MB • Extremely Compact</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-space-xs shrink-0">
+              <button class="btn-model-download flex items-center gap-space-xs px-space-md py-2 rounded-full bg-primary-container text-on-primary-container hover:bg-primary-container/90 active:scale-95 transition-all cursor-pointer shadow-sm" onclick="simulateDownload(this, 'TinyLlama 1.1B')">
+                <span class="material-symbols-outlined text-[18px]">download</span>
+                <span class="text-xs font-semibold text-on-primary-container">Download</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/60 transition-colors rounded-lg" title="Settings" onclick="openModelSettings('TinyLlama 1.1B')">
+                <span class="material-symbols-outlined text-[20px]">tune</span>
+              </button>
+              <button class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/40 transition-colors rounded-lg" title="Delete" onclick="deleteModel(this, 'TinyLlama 1.1B')">
+                <span class="material-symbols-outlined text-[20px]">delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Floating Action Button (FAB) -->
+      <div class="fixed bottom-24 right-gutter z-40 max-w-4xl mx-auto">
+        <button class="w-14 h-14 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer" onclick="openAddModelModal()" title="Add Custom Model">
+          <span class="material-symbols-outlined text-[28px]">add</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- =======================================================
+         VIEW 3: BENCHMARK SCREEN (SCREEN 4)
+         ======================================================= -->
+    <div id="view-benchmark" class="app-screen flex-col w-full pb-10 space-y-space-lg">
+      
+      <!-- Device Information Card -->
+      <div class="bg-surface-container-low rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-space-sm">
+            <div class="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center text-primary">
+              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">phone_android</span>
+            </div>
+            <div>
+              <h2 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Device Information</h2>
+              <p class="text-body-sm text-on-surface-variant">Hardware capabilities &amp; limits</p>
+            </div>
+          </div>
+          <span class="px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-label-sm font-medium">Optimal</span>
+        </div>
+        <div class="grid grid-cols-2 gap-space-sm pt-space-xs">
+          <div class="bg-surface-container-lowest p-space-md rounded-lg flex flex-col">
+            <span class="text-label-md text-on-surface-variant text-xs">Device</span>
+            <span class="text-body-md font-medium text-on-surface truncate">Samsung Android</span>
+          </div>
+          <div class="bg-surface-container-lowest p-space-md rounded-lg flex flex-col">
+            <span class="text-label-md text-on-surface-variant text-xs">CPU &amp; Cores</span>
+            <span class="text-body-md font-medium text-on-surface truncate">8 Cores (ARMv9)</span>
+          </div>
+          <div class="bg-surface-container-lowest p-space-md rounded-lg flex flex-col">
+            <span class="text-label-md text-on-surface-variant text-xs">RAM Allocation</span>
+            <span class="text-body-md font-medium text-on-surface truncate">6.9 GB / 8.0 GB</span>
+          </div>
+          <div class="bg-surface-container-lowest p-space-md rounded-lg flex flex-col">
+            <span class="text-label-md text-on-surface-variant text-xs">GPU Accelerator</span>
+            <span class="text-body-md font-medium text-on-surface truncate">Adreno 730</span>
+          </div>
+        </div>
+        <div class="bg-surface-container-lowest p-space-md rounded-lg flex items-center justify-between">
+          <div class="flex items-center gap-space-sm">
+            <span class="material-symbols-outlined text-primary">hard_drive</span>
+            <div class="flex flex-col">
+              <span class="text-label-md text-on-surface-variant text-xs">Available Storage</span>
+              <span class="text-body-md font-medium text-on-surface text-sm">45 GB free of 128 GB</span>
+            </div>
+          </div>
+          <div class="w-24 h-2 bg-surface-container-high rounded-full overflow-hidden">
+            <div class="bg-primary h-full w-[65%] rounded-full"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Model Selection & Run Control -->
+      <div class="bg-surface-container-low rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-space-sm">
+            <div class="w-10 h-10 rounded-xl bg-primary-fixed flex items-center justify-center text-primary">
+              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">neurology</span>
+            </div>
+            <div>
+              <h2 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Target Model</h2>
+              <p class="text-body-sm text-on-surface-variant">Select SLM to benchmark</p>
+            </div>
+          </div>
+        </div>
+        <div class="relative">
+          <select class="w-full bg-surface-container-lowest text-on-surface text-body-md rounded-xl p-space-md pr-10 appearance-none focus:outline-none focus:ring-2 focus:ring-primary transition-all cursor-pointer" id="model-select">
+            <option selected="" value="gemma-3-4b">Gemma 3 4B (Default Active)</option>
+            <option value="bonsai-8b">Bonsai 8B Instruct</option>
+            <option value="phi-4-mini">Phi-4 Mini (3.8B)</option>
+          </select>
+          <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+        </div>
+        <!-- Benchmark Test Prompt Preview -->
+        <div class="bg-surface-container-lowest p-space-md rounded-lg flex flex-col gap-space-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-label-md text-primary font-medium text-xs">Test Prompt</span>
+            <span class="text-label-sm text-on-surface-variant text-xs">Standard Suite</span>
+          </div>
+          <p class="text-body-md text-on-surface italic text-sm">"Explain what recursion is in programming."</p>
+        </div>
+        <button class="w-full bg-primary text-on-primary rounded-full py-4 px-space-lg flex items-center justify-center gap-space-sm font-label-lg shadow-md hover:bg-primary/90 active:scale-[0.98] transition-all cursor-pointer" id="run-benchmark-btn" onclick="triggerBenchmark()">
+          <span class="material-symbols-outlined" id="btn-icon">play_arrow</span>
+          <span id="btn-text">Run Benchmark</span>
+        </button>
+      </div>
+
+      <!-- Loading State Overlay / Container (Hidden by default) -->
+      <div class="hidden bg-surface-container-low rounded-xl p-space-xl shadow-sm flex flex-col items-center justify-center gap-space-md text-center py-10" id="benchmark-loader">
+        <div class="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+        <div>
+          <h3 class="text-headline-sm text-on-surface font-semibold">Running Benchmark...</h3>
+          <p class="text-body-sm text-on-surface-variant">Evaluating tokens/sec and memory load on local hardware</p>
+        </div>
+      </div>
+
+      <!-- Results Dashboard (Shown after run) -->
+      <div class="flex flex-col gap-space-md" id="results-dashboard">
+        <div class="flex items-center justify-between px-space-xs">
+          <h2 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Benchmark Results</h2>
+          <span class="text-label-sm text-secondary font-medium bg-secondary-container px-2.5 py-1 rounded-full text-xs">Completed Just Now</span>
+        </div>
+        <!-- 2-Column Grid of Small Metric Cards -->
+        <div class="grid grid-cols-2 gap-space-md">
+          <!-- Card 1 -->
+          <div class="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-space-xs shadow-sm">
+            <div class="flex items-center justify-between text-primary">
+              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">bolt</span>
+              <span class="text-label-sm text-on-surface-variant text-xs">Speed</span>
+            </div>
+            <span id="bm-res-speed" class="text-headline-md font-headline-md text-on-surface text-2xl font-bold">24.6</span>
+            <span class="text-label-md text-on-surface-variant text-xs">Tokens / Second</span>
+          </div>
+          <!-- Card 2 -->
+          <div class="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-space-xs shadow-sm">
+            <div class="flex items-center justify-between text-primary">
+              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">timer</span>
+              <span class="text-label-sm text-on-surface-variant text-xs">First Token</span>
+            </div>
+            <span id="bm-res-ttft" class="text-headline-md font-headline-md text-on-surface text-2xl font-bold">320 ms</span>
+            <span class="text-label-md text-on-surface-variant text-xs">TTFT Latency</span>
+          </div>
+          <!-- Card 3 -->
+          <div class="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-space-xs shadow-sm">
+            <div class="flex items-center justify-between text-primary">
+              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">hourglass_top</span>
+              <span class="text-label-sm text-on-surface-variant text-xs">Response</span>
+            </div>
+            <span id="bm-res-latency" class="text-headline-md font-headline-md text-on-surface text-2xl font-bold">1.8 s</span>
+            <span class="text-label-md text-on-surface-variant text-xs">Average Latency</span>
+          </div>
+          <!-- Card 4 -->
+          <div class="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-space-xs shadow-sm">
+            <div class="flex items-center justify-between text-primary">
+              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">schedule</span>
+              <span class="text-label-sm text-on-surface-variant text-xs">Duration</span>
+            </div>
+            <span id="bm-res-duration" class="text-headline-md font-headline-md text-on-surface text-2xl font-bold">3.2 s</span>
+            <span class="text-label-md text-on-surface-variant text-xs">Total Generation</span>
+          </div>
+          <!-- Card 5 -->
+          <div class="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-space-xs shadow-sm">
+            <div class="flex items-center justify-between text-primary">
+              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">memory</span>
+              <span class="text-label-sm text-on-surface-variant text-xs">RAM / VRAM</span>
+            </div>
+            <span id="bm-res-memory" class="text-headline-md font-headline-md text-on-surface text-2xl font-bold">1.9 GB</span>
+            <span class="text-label-md text-on-surface-variant text-xs">Memory Usage</span>
+          </div>
+          <!-- Card 6 -->
+          <div class="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-space-xs shadow-sm">
+            <div class="flex items-center justify-between text-primary">
+              <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">format_h4</span>
+              <span class="text-label-sm text-on-surface-variant text-xs">Processor</span>
+            </div>
+            <span id="bm-res-cpu" class="text-headline-md font-headline-md text-on-surface text-2xl font-bold">68%</span>
+            <span class="text-label-md text-on-surface-variant text-xs">CPU Load</span>
+          </div>
+        </div>
+        <!-- Action to Re-run -->
+        <button class="w-full bg-surface-container-low border border-surface-variant/40 text-on-surface rounded-full py-3.5 px-space-lg flex items-center justify-center gap-space-sm font-label-lg hover:bg-surface-container transition-all cursor-pointer font-medium text-sm" onclick="triggerBenchmark()">
+          <span class="material-symbols-outlined text-[18px]">refresh</span>
+          <span>Run Benchmark Again</span>
+        </button>
+      </div>
+
+      <!-- Benchmark History -->
+      <div class="bg-surface-container-low rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md">
+        <div class="flex items-center justify-between">
+          <h2 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Benchmark History</h2>
+          <span class="text-label-sm text-on-surface-variant text-xs">3 past runs</span>
+        </div>
+        <div class="flex flex-col gap-space-sm">
+          <!-- History Item 1 -->
+          <div class="bg-surface-container-lowest p-space-md rounded-lg flex items-center justify-between">
+            <div class="flex flex-col gap-space-xs">
+              <span class="text-body-md font-medium text-on-surface text-sm">Gemma 3 4B</span>
+              <span class="text-body-sm text-on-surface-variant text-xs">24.6 tokens/s, 320 ms TTFT</span>
+            </div>
+            <span class="text-label-sm text-on-surface-variant text-xs">18 Sep 2026</span>
+          </div>
+          <!-- History Item 2 -->
+          <div class="bg-surface-container-lowest p-space-md rounded-lg flex items-center justify-between">
+            <div class="flex flex-col gap-space-xs">
+              <span class="text-body-md font-medium text-on-surface text-sm">Phi-4 Mini</span>
+              <span class="text-body-sm text-on-surface-variant text-xs">31.2 tokens/s, 240 ms TTFT</span>
+            </div>
+            <span class="text-label-sm text-on-surface-variant text-xs">15 Sep 2026</span>
+          </div>
+          <!-- History Item 3 -->
+          <div class="bg-surface-container-lowest p-space-md rounded-lg flex items-center justify-between">
+            <div class="flex flex-col gap-space-xs">
+              <span class="text-body-md font-medium text-on-surface text-sm">Bonsai 8B</span>
+              <span class="text-body-sm text-on-surface-variant text-xs">14.1 tokens/s, 580 ms TTFT</span>
+            </div>
+            <span class="text-label-sm text-on-surface-variant text-xs">10 Sep 2026</span>
+          </div>
+        </div>
+      </div>
+    <!-- =======================================================
+         VIEW 4: CHAT HISTORY SCREEN
+         ======================================================= -->
+    <div id="view-history" class="app-screen flex-col w-full pb-16 space-y-space-md">
+      
+      <!-- Top Actions Bar: Search + New Chat Button -->
+      <div class="flex items-center gap-space-sm pt-2">
+        <div class="flex-1 relative flex items-center bg-surface-container-low border border-surface-variant/40 rounded-full px-4 py-1.5 shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+          <span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-2">search</span>
+          <input id="history-search-input" class="w-full bg-transparent py-1.5 text-sm text-on-surface placeholder:text-outline focus:outline-none" placeholder="Search chats..." type="text">
+          <button id="history-clear-search" class="hidden text-on-surface-variant hover:text-on-surface p-1 cursor-pointer">
+            <span class="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+        <button id="btn-history-new-chat" class="bg-primary text-on-primary rounded-full px-4 py-2.5 font-medium text-xs flex items-center gap-1.5 shadow-sm hover:bg-primary/90 active:scale-95 transition-all cursor-pointer shrink-0">
+          <span class="material-symbols-outlined text-[18px]">add</span>
+          <span>New Chat</span>
+        </button>
+      </div>
+
+      <!-- Chat History Cards List Container -->
+      <div id="chat-history-container" class="flex flex-col gap-space-sm">
+        <!-- Injected dynamically via JS from localStorage -->
+      </div>
+
+      <!-- Empty State (Shown when no chats exist) -->
+      <div id="chat-history-empty" class="hidden flex-col items-center justify-center py-16 px-4 text-center">
+        <div class="w-20 h-20 mb-4 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+          <span class="material-symbols-outlined text-[36px]">forum</span>
+        </div>
+        <h3 class="text-xl font-bold text-on-surface mb-1">No chat history yet</h3>
+        <p class="text-sm text-on-surface-variant max-w-xs mb-6">Start a conversation with your local SLM. All chats remain 100% private on your device.</p>
+        <button id="btn-start-first-chat" class="w-[185px] h-10 bg-primary text-on-primary rounded-full font-medium text-sm shadow-md hover:bg-primary/90 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer mx-auto">
+          <span class="material-symbols-outlined text-[18px]">add</span>
+          <span>Start New Chat</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- =======================================================
+         VIEW 5: ACTIVE CONVERSATION THREAD
+         ======================================================= -->
+    <div id="view-thread" class="app-screen flex-col w-full pb-20 flex-grow min-h-[75vh]">
+      <!-- Thread Header -->
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-surface-variant/40">
+        <div class="flex items-center gap-2">
+          <button id="btn-back-to-history" class="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-variant/50 transition-colors cursor-pointer" title="Back">
+            <span class="material-symbols-outlined text-[20px]">arrow_back</span>
+          </button>
+          <div class="flex flex-col">
+            <h2 id="thread-title" class="font-bold text-base text-on-surface truncate max-w-[220px] sm:max-w-md">Explain Recursion</h2>
+            <span id="thread-model-badge" class="text-[11px] text-on-surface-variant flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Gemma 3 4B • Local RAM
+            </span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="btn-delete-active-chat" class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-error hover:bg-error-container/40 transition-colors cursor-pointer" title="Delete Chat">
+            <span class="material-symbols-outlined text-[18px]">delete</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages Stream -->
+      <div id="thread-messages-list" class="flex-1 flex flex-col gap-4 overflow-y-auto pr-1 pb-4">
+        <!-- Populated via JS -->
+      </div>
+
+      <!-- Active Thread Input Bar -->
+      <div class="sticky bottom-0 bg-surface pt-2">
+        <div class="w-full relative flex items-center bg-surface-container-low border border-surface-variant/50 rounded-full px-4 py-1.5 shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+          <input id="thread-input" class="w-full bg-transparent py-2 text-sm text-on-surface placeholder:text-outline focus:outline-none" placeholder="Type a message..." type="text">
+          <button id="thread-send-btn" class="w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0 hover:bg-primary/90 active:scale-95 transition-all shadow-sm cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">send</span>
+          </button>
+        </div>
+        <p class="text-center text-[11px] text-on-surface-variant/70 mt-1.5">Offline SLM • 0% network usage</p>
+      </div>
+    </div>
+
+    <!-- Placeholder notification toast -->
+    <div id="toast-bar" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-on-surface text-surface px-4 py-2.5 rounded-full text-xs font-medium shadow-xl opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-2">
+      <span class="material-symbols-outlined text-[16px] text-primary-container">check_circle</span>
+      <span id="toast-text">Message</span>
+    </div>
+
+  </main>
+
+  <!-- ================= BOTTOM NAVIGATION BAR ================= -->
+  <nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface/90 backdrop-blur-xl border-t border-surface-variant/40">
+    <div class="flex justify-around items-center h-20 px-space-md max-w-4xl mx-auto">
+      
+      <!-- Tab 1: Chat -->
+      <button class="nav-tab flex flex-col items-center justify-center gap-space-xs w-16 h-16 rounded-xl transition-all cursor-pointer bg-primary-container text-on-primary-container font-medium" data-target="chat">
+        <span class="material-symbols-outlined text-[22px]">chat</span>
+        <span class="text-xs">Chat</span>
+      </button>
+
+      <!-- Tab 2: Models -->
+      <button class="nav-tab flex flex-col items-center justify-center gap-space-xs w-16 h-16 rounded-xl text-on-surface-variant hover:text-on-surface transition-all cursor-pointer" data-target="models">
+        <span class="material-symbols-outlined text-[22px]">neurology</span>
+        <span class="text-xs">Models</span>
+      </button>
+
+      <!-- Tab 3: Benchmark -->
+      <button class="nav-tab flex flex-col items-center justify-center gap-space-xs w-16 h-16 rounded-xl text-on-surface-variant hover:text-on-surface transition-all cursor-pointer" data-target="benchmark">
+        <span class="material-symbols-outlined text-[22px]">speed</span>
+        <span class="text-xs">Benchmark</span>
+      </button>
+
+      <!-- Tab 4: Settings -->
+      <button class="nav-tab flex flex-col items-center justify-center gap-space-xs w-16 h-16 rounded-xl text-on-surface-variant hover:text-on-surface transition-all cursor-pointer" data-target="settings">
+        <span class="material-symbols-outlined text-[22px]">settings</span>
+        <span class="text-xs">Settings</span>
+      </button>
+
+    </div>
+  </nav>
+
+  <!-- ================= SCRIPTS ================= -->
+  <script>
+    // =======================================================
+    // LOGOS MAP FOR CHAT HISTORY ITEMS
+    // =======================================================
+    const LOGOS_MAP = {
+      gemma: `
+        <svg class="w-7 h-7" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="hGemma1" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#1A73E8"/>
+              <stop offset="35%" stop-color="#4285F4"/>
+              <stop offset="70%" stop-color="#8E44AD"/>
+              <stop offset="100%" stop-color="#EA4335"/>
+            </linearGradient>
+            <linearGradient id="hGemma2" x1="44" y1="4" x2="4" y2="44" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#00C9FF"/>
+              <stop offset="60%" stop-color="#6C5CE7"/>
+              <stop offset="100%" stop-color="#FF5376"/>
+            </linearGradient>
+          </defs>
+          <path d="M24 3C24 14.6 33.4 24 45 24C33.4 24 24 33.4 24 45C24 33.4 14.6 24 3 24C14.6 24 24 14.6 24 3Z" fill="url(#hGemma1)"/>
+          <path d="M24 9C24 17.28 30.72 24 39 24C30.72 24 24 30.72 24 39C24 30.72 17.28 24 9 24C17.28 24 24 17.28 24 9Z" fill="url(#hGemma2)" fill-opacity="0.85"/>
+          <circle cx="24" cy="24" r="4" fill="#FFFFFF"/>
+        </svg>
+      `,
+      phi: `
+        <svg class="w-7 h-7" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="hPhi" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#00BCF2"/>
+              <stop offset="45%" stop-color="#0078D4"/>
+              <stop offset="100%" stop-color="#6B46C1"/>
+            </linearGradient>
+          </defs>
+          <circle cx="24" cy="24" r="14.5" stroke="url(#hPhi)" stroke-width="4.5"/>
+          <path d="M24 5V43" stroke="url(#hPhi)" stroke-width="4.5" stroke-linecap="round"/>
+        </svg>
+      `,
+      qwen: `
+        <svg class="w-7 h-7" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="hQwen1" x1="8" y1="8" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#4F46E5"/>
+              <stop offset="100%" stop-color="#8B5CF6"/>
+            </linearGradient>
+            <linearGradient id="hQwen2" x1="40" y1="8" x2="8" y2="40" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#3B82F6"/>
+              <stop offset="100%" stop-color="#7C3AED"/>
+            </linearGradient>
+          </defs>
+          <path d="M24 5L40 14.5V33.5L24 43L8 33.5V14.5L24 5Z" stroke="url(#hQwen1)" stroke-width="4.5" stroke-linejoin="round"/>
+          <path d="M24 5L40 14.5L24 24L8 14.5L24 5Z" fill="url(#hQwen2)" fill-opacity="0.35"/>
+          <circle cx="24" cy="24" r="3.5" fill="#6366F1"/>
+        </svg>
+      `
+    };
+
+    // =======================================================
+    // NAVIGATION DRAWER LOGIC
+    // =======================================================
+    const drawerBackdrop = document.getElementById('nav-drawer-backdrop');
+    const drawerPanel = document.getElementById('nav-drawer-panel');
+    const menuBtn = document.getElementById('header-left-btn');
+    const closeDrawerBtn = document.getElementById('close-drawer-btn');
+
+    function openDrawer() {
+      drawerBackdrop.classList.remove('hidden');
+      setTimeout(() => {
+        drawerBackdrop.classList.remove('opacity-0');
+        drawerBackdrop.classList.add('opacity-100');
+        drawerPanel.classList.remove('-translate-x-full');
+      }, 10);
+    }
+
+    function closeDrawer() {
+      drawerBackdrop.classList.remove('opacity-100');
+      drawerBackdrop.classList.add('opacity-0');
+      drawerPanel.classList.add('-translate-x-full');
+      setTimeout(() => {
+        drawerBackdrop.classList.add('hidden');
+      }, 300);
+    }
+
+    if (menuBtn) menuBtn.addEventListener('click', openDrawer);
+    if (closeDrawerBtn) closeDrawerBtn.addEventListener('click', closeDrawer);
+    if (drawerBackdrop) drawerBackdrop.addEventListener('click', closeDrawer);
+
+    // Drawer Menu Items Click
+    document.querySelectorAll('.drawer-menu-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.getAttribute('data-target');
+        closeDrawer();
+        if (target === 'pals') {
+          showToastNotification('Pals (Offline Agents) coming soon!');
+        } else {
+          switchTab(target);
+        }
+      });
+    });
+
+    // =======================================================
+    // SCREEN SWITCHER
+    // =======================================================
+    function switchTab(tabKey) {
+      const screens = document.querySelectorAll('.app-screen');
+      screens.forEach(s => s.classList.remove('active'));
+
+      const targetScreen = document.getElementById('view-' + tabKey);
+      if (targetScreen) {
+        targetScreen.classList.add('active');
+      }
+
+      // Update Nav Buttons
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        const key = btn.getAttribute('data-target');
+        if (key === tabKey) {
+          btn.className = 'nav-tab flex flex-col items-center justify-center gap-space-xs w-16 h-16 rounded-xl transition-all cursor-pointer bg-primary-container text-on-primary-container font-medium';
+        } else {
+          btn.className = 'nav-tab flex flex-col items-center justify-center gap-space-xs w-16 h-16 rounded-xl text-on-surface-variant hover:text-on-surface transition-all cursor-pointer';
+        }
+      });
+
+      // Update Top Header Screen Title
+      const headerTitle = document.getElementById('header-screen-title');
+      if (tabKey === 'chat') {
+        headerTitle.textContent = 'PocketLM';
+      } else if (tabKey === 'models') {
+        headerTitle.textContent = 'Models';
+      } else if (tabKey === 'benchmark') {
+        headerTitle.textContent = 'Benchmark';
+      } else if (tabKey === 'history') {
+        headerTitle.textContent = 'Chat History';
+        renderChatHistoryList();
+      } else if (tabKey === 'thread') {
+        headerTitle.textContent = 'Conversation';
+      } else if (tabKey === 'settings') {
+        headerTitle.textContent = 'Settings';
+        showToastNotification('Settings screen coming up next!');
+      }
+    }
+
+    // =======================================================
+    // LOCAL CHAT HISTORY DATA (OFFLINE STORAGE)
+    // =======================================================
+    const DEFAULT_CHATS = [
+      {
+        id: 'chat-1',
+        title: 'Explain Recursion',
+        snippet: 'Recursion is a programming technique where a function calls itself to solve smaller sub-problems...',
+        time: 'Today, 4:32 PM',
+        modelName: 'Gemma 3 4B',
+        modelLogoKey: 'gemma',
+        messages: [
+          { role: 'user', text: 'Can you explain what recursion is in programming?' },
+          { role: 'assistant', text: 'Recursion is a programming technique where a function calls itself to solve smaller instances of the same problem, continuing until it reaches an explicit base condition that terminates execution.' }
+        ]
+      },
+      {
+        id: 'chat-2',
+        title: 'Java DSA Questions',
+        snippet: 'Explain linked list reversal with edge cases and three-pointer approach...',
+        time: 'Yesterday, 8:15 PM',
+        modelName: 'Phi-4 Mini',
+        modelLogoKey: 'phi',
+        messages: [
+          { role: 'user', text: 'How do I reverse a singly linked list in Java in-place?' },
+          { role: 'assistant', text: 'To reverse a singly linked list in-place, maintain three pointers: prev (null), current (head), and nextNode. You traverse and flip current.next = prev until reaching the end.' }
+        ]
+      },
+      {
+        id: 'chat-3',
+        title: 'Machine Learning Basics',
+        snippet: 'What is supervised learning vs unsupervised learning in practical applications...',
+        time: '18 Sep',
+        modelName: 'Qwen 2.5 3B',
+        modelLogoKey: 'qwen',
+        messages: [
+          { role: 'user', text: 'What is the difference between supervised and unsupervised learning?' },
+          { role: 'assistant', text: 'Supervised learning trains on labeled dataset pairs (input X, ground truth Y) to predict outcomes, whereas unsupervised learning analyzes unlabeled data to discover hidden patterns and clusters.' }
+        ]
+      }
+    ];
+
+    function getLocalChats() {
+      try {
+        const saved = localStorage.getItem('offline_slm_chat_history');
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+      return DEFAULT_CHATS;
+    }
+
+    function saveLocalChats(chats) {
+      try {
+        localStorage.setItem('offline_slm_chat_history', JSON.stringify(chats));
+      } catch (e) {
+        console.error(e);
+      }
+      updateHistoryBadge();
+    }
+
+    function updateHistoryBadge() {
+      const chats = getLocalChats();
+      const badge = document.getElementById('drawer-history-badge');
+      if (badge) badge.textContent = chats.length;
+    }
+
+    let activeChatId = null;
+
+    // Render Chat History Cards
+    function renderChatHistoryList(filterQuery = '') {
+      const container = document.getElementById('chat-history-container');
+      const emptyState = document.getElementById('chat-history-empty');
+      if (!container) return;
+
+      const chats = getLocalChats();
+      let filtered = chats;
+
+      if (filterQuery.trim()) {
+        const q = filterQuery.toLowerCase();
+        filtered = filtered.filter(c => 
+          c.title.toLowerCase().includes(q) || 
+          c.snippet.toLowerCase().includes(q) ||
+          c.modelName.toLowerCase().includes(q)
+        );
+      }
+
+      container.innerHTML = '';
+
+      if (filtered.length === 0) {
+        emptyState.classList.remove('hidden');
+        emptyState.classList.add('flex');
+        return;
+      } else {
+        emptyState.classList.remove('flex');
+        emptyState.classList.add('hidden');
+      }
+
+      filtered.forEach(chat => {
+        const card = document.createElement('div');
+        card.className = 'bg-surface-container-low border border-surface-variant/30 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex items-center gap-3.5 cursor-pointer active:scale-[0.99] group';
+        
+        const logoSvg = LOGOS_MAP[chat.modelLogoKey] || LOGOS_MAP.gemma;
+
+        card.innerHTML = `
+          <div class="w-11 h-11 rounded-xl bg-white shadow-sm border border-surface-variant/40 flex items-center justify-center shrink-0 overflow-hidden">
+            ${logoSvg}
+          </div>
+          <div class="flex-1 min-w-0" onclick="openConversationThread('${chat.id}')">
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <h3 class="font-semibold text-sm text-on-surface truncate group-hover:text-primary transition-colors">${escapeHtml(chat.title)}</h3>
+              <span class="text-[11px] text-on-surface-variant shrink-0 font-medium">${escapeHtml(chat.time)}</span>
+            </div>
+            <p class="text-xs text-on-surface-variant truncate">${escapeHtml(chat.snippet)}</p>
+          </div>
+          <button class="w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant/70 hover:text-error hover:bg-error-container/40 transition-colors shrink-0 cursor-pointer" title="Delete Chat" onclick="event.stopPropagation(); deleteHistoryChat('${chat.id}', '${escapeHtml(chat.title)}');">
+            <span class="material-symbols-outlined text-[18px]">delete</span>
+          </button>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    // Open Conversation Thread
+    function openConversationThread(chatId) {
+      const chats = getLocalChats();
+      const chat = chats.find(c => c.id === chatId);
+      if (!chat) return;
+
+      activeChatId = chatId;
+      switchTab('thread');
+
+      document.getElementById('thread-title').textContent = chat.title;
+      document.getElementById('thread-model-badge').innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+        ${chat.modelName} • Local RAM
+      `;
+
+      renderThreadMessages(chat.messages, chat.modelLogoKey);
+    }
+
+    // Render Messages inside Active Thread
+    function renderThreadMessages(messages, modelLogoKey) {
+      const threadContainer = document.getElementById('thread-messages-list');
+      if (!threadContainer) return;
+      threadContainer.innerHTML = '';
+
+      const logoSvg = LOGOS_MAP[modelLogoKey] || LOGOS_MAP.gemma;
+
+      messages.forEach(msg => {
+        const msgEl = document.createElement('div');
+        if (msg.role === 'user') {
+          msgEl.className = 'flex justify-end gap-2 max-w-[88%] ml-auto';
+          msgEl.innerHTML = `
+            <div class="bg-primary text-on-primary rounded-2xl rounded-tr-xs px-4 py-2.5 text-sm shadow-sm leading-relaxed">
+              ${escapeHtml(msg.text)}
+            </div>
+          `;
+        } else {
+          msgEl.className = 'flex items-start gap-2.5 max-w-[92%] mr-auto';
+          msgEl.innerHTML = `
+            <div class="w-7 h-7 rounded-lg bg-white shadow-sm border border-surface-variant/40 flex items-center justify-center shrink-0 mt-0.5 overflow-hidden">
+              ${logoSvg}
+            </div>
+            <div class="bg-surface-container-low border border-surface-variant/40 text-on-surface rounded-2xl rounded-tl-xs px-4 py-2.5 text-sm shadow-sm leading-relaxed">
+              ${escapeHtml(msg.text)}
+              <div class="text-[10px] text-on-surface-variant mt-1 flex items-center gap-1 font-medium">
+                <span class="text-primary font-bold">Offline SLM</span> • 28.4 tok/s
+              </div>
+            </div>
+          `;
+        }
+        threadContainer.appendChild(msgEl);
+      });
+
+      threadContainer.scrollTop = threadContainer.scrollHeight;
+    }
+
+    // Delete Conversation
+    function deleteHistoryChat(chatId, chatTitle) {
+      if (confirm(`Delete conversation "${chatTitle}"?`)) {
+        let chats = getLocalChats();
+        chats = chats.filter(c => c.id !== chatId);
+        saveLocalChats(chats);
+        renderChatHistoryList();
+        showToastNotification(`Conversation deleted`);
+      }
+    }
+
+    // Delete Active Thread Chat
+    document.getElementById('btn-delete-active-chat').addEventListener('click', () => {
+      if (activeChatId) {
+        deleteHistoryChat(activeChatId, 'this chat');
+        switchTab('history');
+      }
+    });
+
+    // Back to History
+    document.getElementById('btn-back-to-history').addEventListener('click', () => {
+      switchTab('history');
+    });
+
+    // New Chat Action
+    document.getElementById('btn-history-new-chat').addEventListener('click', () => {
+      startNewChatSession();
+    });
+    document.getElementById('btn-start-first-chat').addEventListener('click', () => {
+      startNewChatSession();
+    });
+
+    function startNewChatSession() {
+      const chats = getLocalChats();
+      const newId = 'chat-' + Date.now();
+      const newChat = {
+        id: newId,
+        title: 'New Offline Conversation',
+        snippet: 'Just started...',
+        time: 'Just now',
+        modelName: 'Gemma 3 4B',
+        modelLogoKey: 'gemma',
+        messages: [
+          { role: 'assistant', text: 'Hello! I am running completely offline and privately on your machine. What would you like to explore?' }
+        ]
+      };
+      chats.unshift(newChat);
+      saveLocalChats(chats);
+      openConversationThread(newId);
+      showToastNotification('Started new private chat session');
+    }
+
+    // Send Message inside Thread
+    function sendThreadMessage() {
+      const input = document.getElementById('thread-input');
+      const text = input.value.trim();
+      if (!text || !activeChatId) return;
+
+      const chats = getLocalChats();
+      const chat = chats.find(c => c.id === activeChatId);
+      if (!chat) return;
+
+      input.value = '';
+
+      // Append user msg
+      chat.messages.push({ role: 'user', text: text });
+      chat.snippet = text;
+      chat.time = 'Just now';
+      saveLocalChats(chats);
+      renderThreadMessages(chat.messages, chat.modelLogoKey);
+
+      // Simulate streaming assistant response
+      setTimeout(() => {
+        const reply = `Processed locally on ${chat.modelName}.\nYour query: "${text}"\nComputed offline with 0 remote requests.`;
+        chat.messages.push({ role: 'assistant', text: reply });
+        chat.snippet = reply;
+        saveLocalChats(chats);
+        renderThreadMessages(chat.messages, chat.modelLogoKey);
+      }, 600);
+    }
+
+    document.getElementById('thread-send-btn').addEventListener('click', sendThreadMessage);
+    document.getElementById('thread-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendThreadMessage();
+    });
+
+    // History Search Input
+    const searchInput = document.getElementById('history-search-input');
+    const clearSearchBtn = document.getElementById('history-clear-search');
+
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        const val = e.target.value;
+        if (val) {
+          clearSearchBtn.classList.remove('hidden');
+        } else {
+          clearSearchBtn.classList.add('hidden');
+        }
+        renderChatHistoryList(val);
+      });
+    }
+
+    if (clearSearchBtn) {
+      clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        clearSearchBtn.classList.add('hidden');
+        renderChatHistoryList();
+        searchInput.focus();
+      });
+    }
+
+    // Helper escape html
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>'"]/g, 
+        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+      );
+    }
+
+    // =======================================================
+    // OTHER APP HANDLERS
+    // =======================================================
+    // Trigger Benchmark Simulation
+    function triggerBenchmark() {
+      const btn = document.getElementById('run-benchmark-btn');
+      const loader = document.getElementById('benchmark-loader');
+      const dashboard = document.getElementById('results-dashboard');
+      const modelSelect = document.getElementById('model-select');
+      
+      if (!btn || !loader || !dashboard) return;
+
+      btn.classList.add('opacity-50', 'pointer-events-none');
+      loader.classList.remove('hidden');
+      dashboard.classList.add('opacity-40', 'pointer-events-none');
+
+      const selectedModel = modelSelect ? modelSelect.value : 'gemma-3-4b';
+
+      setTimeout(() => {
+        loader.classList.add('hidden');
+        dashboard.classList.remove('opacity-40', 'pointer-events-none');
+        btn.classList.remove('opacity-50', 'pointer-events-none');
+
+        const speedEl = document.getElementById('bm-res-speed');
+        const ttftEl = document.getElementById('bm-res-ttft');
+        const latencyEl = document.getElementById('bm-res-latency');
+        const memoryEl = document.getElementById('bm-res-memory');
+
+        if (selectedModel === 'phi-4-mini') {
+          if (speedEl) speedEl.textContent = '31.2';
+          if (ttftEl) ttftEl.textContent = '240 ms';
+          if (latencyEl) latencyEl.textContent = '1.4 s';
+          if (memoryEl) memoryEl.textContent = '2.3 GB';
+        } else if (selectedModel === 'bonsai-8b') {
+          if (speedEl) speedEl.textContent = '14.1';
+          if (ttftEl) ttftEl.textContent = '580 ms';
+          if (latencyEl) latencyEl.textContent = '2.4 s';
+          if (memoryEl) memoryEl.textContent = '3.8 GB';
+        } else {
+          if (speedEl) speedEl.textContent = '24.6';
+          if (ttftEl) ttftEl.textContent = '320 ms';
+          if (latencyEl) latencyEl.textContent = '1.8 s';
+          if (memoryEl) memoryEl.textContent = '1.9 GB';
+        }
+        
+        dashboard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        showToastNotification('Benchmark complete for ' + (modelSelect ? modelSelect.options[modelSelect.selectedIndex].text.split('(')[0].trim() : 'model'));
+      }, 1600);
+    }
+
+    // Attach Bottom Nav Click Listeners
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.getAttribute('data-target');
+        switchTab(target);
+      });
+    });
+
+    // "Download Model" Button in Chat Empty State -> Switches to Models View
+    document.getElementById('btn-download-model-cta').addEventListener('click', () => {
+      switchTab('models');
+      showToastNotification('Select a model to download');
+    });
+
+    // Download Simulation Handler
+    function simulateDownload(btn, modelName) {
+      const icon = btn.querySelector('.material-symbols-outlined');
+      const text = btn.querySelector('span:not(.material-symbols-outlined)');
+      
+      btn.disabled = true;
+      btn.classList.add('opacity-80');
+      icon.textContent = 'hourglass_top';
+      text.textContent = 'Queued...';
+
+      setTimeout(() => {
+        icon.textContent = 'sync';
+        text.textContent = 'Downloading...';
+        icon.classList.add('animate-spin');
+      }, 500);
+
+      setTimeout(() => {
+        icon.classList.remove('animate-spin');
+        icon.textContent = 'check';
+        text.textContent = 'Installed';
+        btn.classList.remove('bg-primary-container', 'text-on-primary-container');
+        btn.classList.add('bg-surface-container-high', 'text-on-surface');
+        showToastNotification(modelName + ' downloaded successfully!');
+      }, 1600);
+    }
+
+    // Delete Model Action
+    function deleteModel(btn, modelName) {
+      const card = btn.closest('[data-model]');
+      if (confirm('Are you sure you want to delete ' + modelName + '?')) {
+        const downloadBtn = card.querySelector('.btn-model-download');
+        if (downloadBtn) {
+          downloadBtn.disabled = false;
+          downloadBtn.classList.remove('opacity-80', 'bg-surface-container-high', 'text-on-surface');
+          downloadBtn.classList.add('bg-primary-container', 'text-on-primary-container');
+          downloadBtn.querySelector('.material-symbols-outlined').textContent = 'download';
+          downloadBtn.querySelector('span:not(.material-symbols-outlined)').textContent = 'Download';
+        }
+        showToastNotification(modelName + ' removed from cache');
+      }
+    }
+
+    // Model Settings dialog stub
+    function openModelSettings(modelName) {
+      showToastNotification(modelName + ' configuration ready for next screen');
+    }
+
+    // FAB Add Model Modal stub
+    function openAddModelModal() {
+      showToastNotification('Open local model file browser or Hub');
+    }
+
+    // Toast Notification helper
+    function showToastNotification(msg) {
+      const toast = document.getElementById('toast-bar');
+      const toastText = document.getElementById('toast-text');
+      toastText.textContent = msg;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2500);
+    }
+
+    // Empty Chat Input handler
+    document.getElementById('chat-empty-send-btn').addEventListener('click', () => {
+      const input = document.getElementById('chat-empty-input');
+      if (input.value.trim()) {
+        showToastNotification('Please download and initialize a model first');
+        input.value = '';
+      }
+    });
+
+    document.getElementById('chat-empty-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('chat-empty-send-btn').click();
+      }
+    });
+
+    // Initialize Badge on Load
+    updateHistoryBadge();
+  </script>
+
+</body>
+</html>

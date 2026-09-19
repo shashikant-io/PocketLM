@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 768">
+  <defs>
+    <linearGradient id="logoGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6D2CDB"/>
+      <stop offset="1" stop-color="#7440E8"/>
+    </linearGradient>
+  </defs>
+  <circle cx="384" cy="384" r="384" fill="url(#logoGradient)"/>
+  <path d="M194 419c0-111 90-201 200-201s200 90 200 201v102H194z" fill="#fff"/>
+  <circle cx="305" cy="372" r="41" fill="#202020"/>
+  <circle cx="483" cy="372" r="41" fill="#202020"/>
+</svg>
