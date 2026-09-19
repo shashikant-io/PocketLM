@@ -1,9 +1,5 @@
 # PocketLM
 
-<p align="center">
-  <img src="assets/screenshots/pocketlm_preview.svg" alt="PocketLM app preview" width="420" />
-</p>
-
 PocketLM is a Flutter-based Android app for running small language models locally on-device. It lets users browse a catalog of compact GGUF models, download the one they want, and chat with it without sending data to the cloud.
 
 The app is designed for privacy-first, offline AI experiences on mobile devices, especially for smaller models that can run on-device with reasonable memory and CPU/GPU support.
