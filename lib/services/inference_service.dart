@@ -47,14 +47,15 @@ class InferenceService {
     }
   }
 
-  Future<String> generateResponse(String prompt) async {
+  Future<String> generateResponse(String prompt, {int maxTokens = 512}) async {
     final StringBuffer response = StringBuffer();
-    await generateResponseStream(prompt, response.write);
+    await generateResponseStream(prompt, response.write, maxTokens: maxTokens);
     return response.toString();
   }
 
   Future<void> generateResponseStream(
-      String prompt, void Function(String token) onToken) async {
+      String prompt, void Function(String token) onToken,
+      {int maxTokens = 512}) async {
     await stopGeneration();
     final LlamaController? controller = _controller;
     if (controller == null || loadedModel == null) {
@@ -69,7 +70,7 @@ class InferenceService {
       messages: <ChatMessage>[
         ChatMessage(role: 'user', content: prompt),
       ],
-      maxTokens: 512,
+      maxTokens: maxTokens,
       temperature: 0.7,
     ).listen(
       (String token) {

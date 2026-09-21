@@ -2,7 +2,7 @@
     <application
         android:label="local_slm"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@drawable/pocketlm_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"

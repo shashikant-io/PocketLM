@@ -7,9 +7,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 class AppNavigationDrawer extends StatelessWidget {
   final VoidCallback onChat;
   final VoidCallback onModels;
+  final VoidCallback onBenchmark;
 
   const AppNavigationDrawer(
-      {super.key, required this.onChat, required this.onModels});
+      {super.key,
+      required this.onChat,
+      required this.onModels,
+      required this.onBenchmark});
 
   @override
   Widget build(BuildContext context) {
@@ -25,12 +29,11 @@ class AppNavigationDrawer extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle),
-                    child: ClipOval(
+                      color: AppColors.primary, shape: BoxShape.circle),
+                  child: ClipOval(
                       child: SvgPicture.asset(
-                        'assets/model_logos/pocketlm_logo.svg',
-                        fit: BoxFit.cover))),
+                          'assets/model_logos/pocketlm_logo.svg',
+                          fit: BoxFit.cover))),
               title: const Text(AppStrings.appName,
                   style: TextStyle(
                       fontWeight: FontWeight.w700, color: AppColors.onSurface)),
@@ -65,6 +68,13 @@ class AppNavigationDrawer extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(context);
                   onModels();
+                }),
+            ListTile(
+                leading: const Icon(Icons.speed_outlined),
+                title: const Text('Benchmark'),
+                onTap: () {
+                  Navigator.pop(context);
+                  onBenchmark();
                 }),
             const Divider(indent: 16, endIndent: 16),
             const Spacer(),

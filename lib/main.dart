@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/chat_screen.dart';
+import 'screens/benchmark_screen.dart';
 import 'screens/models_screen.dart';
 import 'services/model_service.dart';
 import 'utils/constants.dart';
@@ -40,23 +41,30 @@ class PocketLmShell extends StatefulWidget {
 class _PocketLmShellState extends State<PocketLmShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ModelService _modelService = ModelService();
-  bool _showModels = false;
+  String _activeScreen = 'chat';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppHeader(
-          title: _showModels ? 'Models' : AppStrings.appName,
+          title: _activeScreen == 'models'
+              ? 'Models'
+              : _activeScreen == 'benchmark'
+                  ? 'Benchmark'
+                  : AppStrings.appName,
           onMenu: () => _scaffoldKey.currentState?.openDrawer()),
       drawer: AppNavigationDrawer(
-          onChat: () => setState(() => _showModels = false),
-          onModels: () => setState(() => _showModels = true)),
-      body: _showModels
+          onChat: () => setState(() => _activeScreen = 'chat'),
+          onModels: () => setState(() => _activeScreen = 'models'),
+          onBenchmark: () => setState(() => _activeScreen = 'benchmark')),
+      body: _activeScreen == 'models'
           ? ModelsScreen(modelService: _modelService)
-          : ChatScreen(
-              modelService: _modelService,
-              onOpenModels: () => setState(() => _showModels = true)),
+          : _activeScreen == 'benchmark'
+              ? BenchmarkScreen(modelService: _modelService)
+              : ChatScreen(
+                  modelService: _modelService,
+                  onOpenModels: () => setState(() => _activeScreen = 'models')),
     );
   }
 }
